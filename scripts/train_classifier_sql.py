@@ -21,17 +21,27 @@ from mxnet.gluon.model_zoo import vision as models
 import sys
 sys.path.append("..")
 
-from models.resblocks import get_resblocks
 from models.cifar_wide_resnet import cifar_wideresnet16_2
 
 from tools import *
+from db import *
 
+task_type = 'CLASSIFICATION'
 
 opt = get_train_argparse()
 
 train = opt.train
 
 model_name = opt.model_name
+
+model_table = pypika.Table('models')
+# query_to_DB = pypika.Query.from_(wrapper_main_table).join(episodes_table).on(wrapper_main_table.episode_id == episodes_table.episode_id).select(wrapper_main_table.episode_id).where(wrapper_main_table.episode_id == episode_id).get_sql()
+query_to_DB = pypika.Query.from_(model_table).select(
+    model_table.episode_id
+    ).where(
+    model_table.episode_id == episode_id
+    ).get_sql()
+
 net_name = opt.net_name
 classes = opt.classes
 
