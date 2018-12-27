@@ -3,7 +3,9 @@ import sys
 import time
 import mysql.connector
 from mysql.connector import errorcode
+import pypika
 from pypika import Table, Query, Field
+import getpass
 
 class NumpyMySQLConv(mysql.connector.conversion.MySQLConverter):
     def _float32_to_mysql(self, value):
@@ -31,7 +33,7 @@ class DB:
         config = {
             'host': 'localhost',
             'port': 3306,
-            'database': 'Data_analysis_dev',
+            'database': 'Network_storage',
             'user': login,
             'password': password,
             'charset': 'utf8',
@@ -79,6 +81,37 @@ class DB:
         except mysql.connector.Error as err:
             raise err
 
+def db_select_or_insert_if_none(table_name, column_name, obj, id_name_sel, db):
+    table = Table(table_name)
+    query = Query.from_(table).select(
+        table.id_name_sel
+    ).where(
+        table.column_name == obj
+    ).get_sql()
+    print(query)
+    sel_data = db.select(query)
+    if sel_data == []:
+        query = Query.into(table).columns(
+            table.column_name
+        ).insert(
+            obj
+        )
+        db.insert(query)
+
+        query = Query.from_(table).select(
+            table.id_name_sel
+        ).where(
+            table.column_name == obj
+        )
+        sel_data = db.select(query)
+
+    try:
+        id = sel_data[0][0]
+    except TypeError:
+        return
+
+    return id
+
 
 def get_db_access():
-    return DB(login='root', password=getpass.getpass('DataBase root password: '))
+    return DB(login='root', password=getpass.getpass('DataBase password: '))

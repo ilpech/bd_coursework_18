@@ -15,18 +15,50 @@ from mxnet.gluon import nn
 from mxnet import gluon, nd
 from mxnet.gluon.data.vision import transforms
 from mxnet import autograd as ag
+import getpass
 
 from mxnet.gluon.model_zoo import vision as models
 
 import sys
 sys.path.append("..")
 
-from models.cifar_wide_resnet import cifar_wideresnet16_2
+from cifar_wide_resnet import cifar_wideresnet16_2
 
 from tools import *
 from db import *
 
+db = get_db_access()
+
 task_type = 'CLASSIFICATION'
+
+table = pypika.Table('task_types')
+
+query = Query.from_(table).select(
+    table.task_name
+).where(
+    table.task_name == task_type
+).get_sql()
+sel_data = db.select(query)
+if sel_data == []:
+    query = Query.into(table).columns(
+        table.task_name
+    ).insert(
+        task_type
+    ).get_sql()
+    db.insert(query)
+
+query = Query.from_(table).select(
+    table.task_id
+).where(
+    table.task_name == task_type
+).get_sql()
+sel_data = db.select(query)
+
+try:
+    task_id = sel_data[0][0]
+except TypeError:
+    print("ERROR IN SELECT")
+    sys.exit(0)
 
 opt = get_train_argparse()
 
@@ -34,19 +66,119 @@ train = opt.train
 
 model_name = opt.model_name
 
-model_table = pypika.Table('models')
-# query_to_DB = pypika.Query.from_(wrapper_main_table).join(episodes_table).on(wrapper_main_table.episode_id == episodes_table.episode_id).select(wrapper_main_table.episode_id).where(wrapper_main_table.episode_id == episode_id).get_sql()
-query_to_DB = pypika.Query.from_(model_table).select(
-    model_table.episode_id
-    ).where(
-    model_table.episode_id == episode_id
+table = pypika.Table('models')
+
+query = Query.from_(table).select(
+    table.model_id
+).where(
+    table.name == model_name
+).where(
+    table.task_id == task_id
+).get_sql()
+sel_data = db.select(query)
+if sel_data == []:
+    query = Query.into(table).columns(
+        table.name,
+        table.task_id
+    ).insert(
+        model_name,
+        task_id
     ).get_sql()
+    print(query)
+    db.insert(query)
+
+query = Query.from_(table).select(
+    table.model_id
+).where(
+    table.name == model_name
+).where(
+    table.task_id == task_id
+).get_sql()
+sel_data = db.select(query)
+
+try:
+    model_id = sel_data[0][0]
+except TypeError:
+    print("ERROR IN SELECT")
+    sys.exit(0)
+
 
 net_name = opt.net_name
 classes = opt.classes
 
 params_dir = opt.params_dir
+
+
+table = pypika.Table('networks')
+
+query = Query.from_(table).select(
+    table.network_id
+).where(
+    table.name == net_name
+).where(
+    table.model_id == model_id
+).get_sql()
+sel_data = db.select(query)
+if sel_data == []:
+    query = Query.into(table).columns(
+        table.name,
+        table.model_id,
+        table.info
+    ).insert(
+        net_name,
+        model_id,
+        params_dir
+    ).get_sql()
+
+    db.insert(query)
+
+query = Query.from_(table).select(
+    table.network_id
+).where(
+    table.name == net_name
+).where(
+    table.model_id == model_id
+).get_sql()
+sel_data = db.select(query)
+
+try:
+    network_id = sel_data[0][0]
+except TypeError:
+    print("ERROR IN SELECT")
+    sys.exit(0)
+
+
 dataset_path = opt.dataset_path
+
+table = pypika.Table('datasets')
+
+query = Query.from_(table).select(
+    table.dataset_id
+).where(
+    table.dataset_full_path == dataset_path
+).get_sql()
+sel_data = db.select(query)
+if sel_data == []:
+    query = Query.into(table).columns(
+        table.dataset_full_path
+    ).insert(
+        dataset_path
+    ).get_sql()
+
+    db.insert(query)
+
+query = Query.from_(table).select(
+    table.dataset_id
+).where(
+    table.dataset_full_path == dataset_path
+).get_sql()
+sel_data = db.select(query)
+
+try:
+    dataset_id = sel_data[0][0]
+except TypeError:
+    print("ERROR IN SELECT")
+    sys.exit(0)
 
 ctx_type = opt.ctx
 device_index = opt.device_index
@@ -74,7 +206,6 @@ if ctx_type == 'cpu':
 elif ctx_type == 'gpu':
     ctx = [mx.gpu(device_index)]
 
-# net = get_resblocks(classes)
 net = cifar_wideresnet16_2(classes=classes)
 
 net.collect_params().initialize(init.Xavier(magnitude=2.24), ctx = ctx)
@@ -104,6 +235,101 @@ optimizer_params = {'wd': wd, 'momentum': momentum, 'learning_rate': lr}
 trainer = gluon.Trainer(net.collect_params(), optimizer, optimizer_params)
 
 train_metric = mx.metric.Accuracy()
+metric_name = 'mx.metric.Accuracy()_val'
+
+
+table = pypika.Table('metrics')
+
+query = Query.from_(table).select(
+    table.metric_id
+).where(
+    table.metric_name == metric_name
+).get_sql()
+sel_data = db.select(query)
+if sel_data == []:
+    query = Query.into(table).columns(
+        table.metric_name
+    ).insert(
+        metric_name
+    ).get_sql()
+    db.insert(query)
+
+query = Query.from_(table).select(
+    table.metric_id
+).where(
+    table.metric_name == metric_name
+).get_sql()
+sel_data = db.select(query)
+
+try:
+    metric_id_val = sel_data[0][0]
+except TypeError:
+    print("ERROR IN SELECT")
+    sys.exit(0)
+
+metric_name = 'mx.metric.Accuracy()_persons'
+
+table = pypika.Table('metrics')
+
+query = Query.from_(table).select(
+    table.metric_id
+).where(
+    table.metric_name == metric_name
+).get_sql()
+sel_data = db.select(query)
+if sel_data == []:
+    query = Query.into(table).columns(
+        table.metric_name
+    ).insert(
+        metric_name
+    ).get_sql()
+    db.insert(query)
+
+query = Query.from_(table).select(
+    table.metric_id
+).where(
+    table.metric_name == metric_name
+).get_sql()
+sel_data = db.select(query)
+
+try:
+    metric_id_persons = sel_data[0][0]
+except TypeError:
+    print("ERROR IN SELECT")
+    sys.exit(0)
+
+metric_name = 'mx.metric.Accuracy()_train'
+
+table = pypika.Table('metrics')
+
+query = Query.from_(table).select(
+    table.metric_id
+).where(
+    table.metric_name == metric_name
+).get_sql()
+sel_data = db.select(query)
+if sel_data == []:
+    query = Query.into(table).columns(
+        table.metric_name
+    ).insert(
+        metric_name
+    ).get_sql()
+    db.insert(query)
+
+query = Query.from_(table).select(
+    table.metric_id
+).where(
+    table.metric_name == metric_name
+).get_sql()
+sel_data = db.select(query)
+
+try:
+    metric_id_train = sel_data[0][0]
+except TypeError:
+    print("ERROR IN SELECT")
+    sys.exit(0)
+
+
 L = gluon.loss.SoftmaxCrossEntropyLoss()
 
 
@@ -122,6 +348,42 @@ if train:
         if epoch % lr_decay_interval == 0 and epoch != 0:
             trainer.set_learning_rate(trainer.learning_rate*lr_decay)
             lr_decay_count += 1
+
+        table = pypika.Table('epochs')
+
+        query = Query.from_(table).select(
+            table.epoch_id
+        ).where(
+            table.network_id == network_id
+        ).where(
+            table.epoch_number == epoch
+        ).get_sql()
+        sel_data = db.select(query)
+        if sel_data == []:
+            query = Query.into(table).columns(
+                table.network_id,
+                table.epoch_number
+            ).insert(
+                network_id,
+                epoch
+            ).get_sql()
+
+            db.insert(query)
+
+        query = Query.from_(table).select(
+            table.epoch_id
+        ).where(
+            table.network_id == network_id
+        ).where(
+            table.epoch_number == epoch
+        ).get_sql()
+        sel_data = db.select(query)
+
+        try:
+            epoch_id = sel_data[0][0]
+        except TypeError:
+            print("ERROR IN SELECT")
+            sys.exit(0)
 
         tic = time.time()
         train_loss = 0
@@ -157,10 +419,84 @@ if train:
         else:
             save_best_val_acc = False
 
+        table
+
         name, val_pillars_acc = test_on_single_class(net, val_data, ctx, 2)
         name, val_person_acc = test_on_single_class(net, val_data, ctx, 1)
         name, val_trash_acc = test_on_single_class(net, val_data, ctx, 3)
         name, val_vertical_acc = test_on_single_class(net, val_data, ctx, 4)
+
+        table = pypika.Table('scores')
+
+
+        query = Query.from_(table).select(
+            table.score_id
+        ).where(
+            table.epoch_id == epoch_id
+        ).where(
+            table.metric_id == metric_id_persons
+        ).where(
+            table.score_value == val_trash_acc
+        ).get_sql()
+        sel_data = db.select(query)
+        if sel_data == []:
+            query = Query.into(table).columns(
+                table.epoch_id,
+                table.metric_id,
+                table.score_value
+            ).insert(
+                epoch_id,
+                metric_id_persons,
+                val_trash_acc
+            ).get_sql()
+
+            db.insert(query)
+
+        query = Query.from_(table).select(
+            table.score_id
+        ).where(
+            table.epoch_id == epoch_id
+        ).where(
+            table.metric_id == metric_id_val
+        ).where(
+            table.score_value == val_acc
+        ).get_sql()
+        sel_data = db.select(query)
+        if sel_data == []:
+            query = Query.into(table).columns(
+                table.epoch_id,
+                table.metric_id,
+                table.score_value
+            ).insert(
+                epoch_id,
+                metric_id_val,
+                val_acc
+            ).get_sql()
+
+            db.insert(query)
+
+        query = Query.from_(table).select(
+            table.score_id
+        ).where(
+            table.epoch_id == epoch_id
+        ).where(
+            table.metric_id == metric_id_train
+        ).where(
+            table.score_value == val_person_acc
+        ).get_sql()
+        sel_data = db.select(query)
+        if sel_data == []:
+            query = Query.into(table).columns(
+                table.epoch_id,
+                table.metric_id,
+                table.score_value
+            ).insert(
+                epoch_id,
+                metric_id_train,
+                train_acc
+            ).get_sql()
+
+            db.insert(query)
 
         scores = ('[Epoch {:d}] Train-acc: {:.3f}, loss: {:.3f} | Val-acc: {:.3f}'
                   '| Pillars-acc: {:.3f} | Persons-acc: {:.3f} | Vertical-acc: {:.3f} | Trash-acc: {:.3f} | time: {:.1f}').format(
